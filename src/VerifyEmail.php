@@ -91,19 +91,25 @@
         return $this->debug;
       }
     }
-
+    /*
+      if valid -> 1
+      if need more check -> -1
+      if not valid  -> -3
+      */
     public function verify() {
       $this->debug[] = 'Verify function was called.';
-
-      $is_valid = false;
+      
+      $is_valid = -1;
 
       //check if this is a yahoo email
       $domain = $this->get_domain($this->email);
       if(in_array(strtolower($domain), $this->_yahoo_domains)) {
-        $is_valid = $this->validate_yahoo();
+        // not valid  -> -3
+        $is_valid = ($this->validate_yahoo() ? 1 : -3);
       }
       else if(in_array(strtolower($domain), $this->_hotmail_domains)){
-        $is_valid = $this->validate_hotmail();
+        // not valid  -> -3
+        $is_valid = ($this->validate_hotmail() ? 1: -3);
       }
       //otherwise check the normal way
       else {
@@ -113,7 +119,8 @@
 
         if(!$this->mx) {
           $this->debug[] = 'No MX record was found.';
-          $this->add_error('100', 'No suitable MX records found.');
+          // not valid  -> -3
+          $is_valid = -3;
           return $is_valid;
         }
         else {
@@ -127,6 +134,8 @@
         if(!$this->connect) {
           $this->debug[] = 'Connection to server failed.';
           $this->add_error('110', 'Could not connect to the server.');
+          // need more check -> -1
+          $is_valid = -1;
           return $is_valid;
         }
         else {
@@ -161,16 +170,30 @@
 
           $this->debug[] = 'Looking for 250 response...';
           if(!preg_match("/^250/i", $from) || !preg_match("/^250/i", $to)){
-            $this->debug[] = 'Not found! Email is invalid.';
-            $is_valid = false;
+            $code = (int)explode(' ', trim($to))[0];
+            if ($code>=550)
+            {
+              $this->debug[] = 'Not found! Email is invalid.';
+               // not valid  -> -3
+              $is_valid = -3;
+              return $is_valid;
+            }
+            else
+            {
+              $this->debug[] = 'Not found! Email is invalid.';
+              // need more check -> -1
+              $is_valid = -1;
+            } 
           }
           else{
             $this->debug[] = 'Found! Email is valid.';
-            $is_valid = true;
+            $is_valid = 1;
           }
         }
         else {
           $this->debug[] = 'Encountered an unknown response code.';
+          // need more check -> -1
+          $is_valid = -1;
         }
       }
 
